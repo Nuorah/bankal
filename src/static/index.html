@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kanban Board</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script defer src="/static/alpine.min.js"></script>
+  <script src="/static/script.js"></script>
+</head>
+
+<body>
+  <div x-data="kanban()">
+    <h1>Kanban</h1>
+
+    <div class="board">
+      <div class="column">
+        <h2>To do</h2>
+        <button @click="showCreateForm = true; newCard.column = 0" class="add-card-btn">+</button>
+        <template x-for="card in todoCards" :key="card.id">
+          <div class="card" @click="selectedCard = card; isEditingCard = false">
+            <h3 x-text="card.title"></h3>
+            <p x-text="card.description"></p>
+          </div>
+        </template>
+      </div>
+
+      <div class="column">
+        <h2>In Progress</h2>
+        <button @click="showCreateForm = true; newCard.column = 1" class="add-card-btn">+</button>
+        <template x-for="card in inProgressCards" :key="card.id">
+          <div class="card" @click="selectedCard = card; isEditingCard = false">
+            <h3 x-text=" card.title"></h3>
+            <p x-text="card.description"></p>
+          </div>
+        </template>
+      </div>
+
+      <div class="column">
+        <h2>Done</h2>
+        <button @click="showCreateForm = true; newCard.column = 2" class="add-card-btn">+</button>
+        <template x-for="card in doneCards" :key="card.id">
+          <div class="card" @click="selectedCard = card; isEditingCard = false">
+            <h3 x-text="card.title"></h3>
+            <p x-text="card.description"></p>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Create card modal -->
+    <div x-show="showCreateForm" @click.self="showCreateForm = false" class="modal-overlay">
+      <div class="modal">
+        <h2>New Card</h2>
+        <form @submit.prevent="createCard">
+          <input type="text" x-model="newCard.title" placeholder="Title" required>
+          <textarea x-model="newCard.description" placeholder="Description" rows="4"></textarea>
+          <div class="modal-buttons">
+            <button type="submit">Create</button>
+            <button type="button" @click="showCreateForm = false">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+
+    <!-- Card view modal -->
+    <div x-show="selectedCard != null && !isEditingCard" @click.self="selectedCard = null" class="modal-overlay">
+      <div class="modal">
+        <div class="modal-header">
+          <h3 x-text="selectedCard?.title"></h3>
+          <div class="modal-timestamps">
+            <span x-text="'Created ' + formatTimestamp(selectedCard?.created_at)"></span>
+            <span x-text="'Updated ' + formatTimestamp(selectedCard?.updated_at)"></span>
+          </div>
+        </div>
+
+        <div class="modal-content">
+          <p x-text="selectedCard?.description || 'No description'"></p>
+        </div>
+
+        <!-- Column selector dropdown -->
+        <div class="column-selector">
+          <label for="column-select">Move to:</label>
+          <select id="column-select" :value="selectedCard?.column" @change="moveCardToColumn($event.target.value)">
+            <option value="0">To do</option>
+            <option value="1">In Progress</option>
+            <option value="2">Done</option>
+          </select>
+        </div>
+
+        <div class="modal-buttons">
+          <button type="button" @click="startEditingCard()">Edit</button>
+          <button type="button" @click="selectedCard = null">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card edit modal -->
+    <div x-show="selectedCard != null && isEditingCard" @click.self="cancelEditCard(); selectedCard=null"
+      class="modal-overlay">
+      <div class="modal">
+        <form @submit.prevent="updateCard">
+          <div class="modal-header">
+            <input type="text" x-model="editCard.title" placeholder="Title" required class="modal-title-input">
+            <div class="modal-timestamps">
+              <span x-text="'Created ' + formatTimestamp(selectedCard?.created_at)"></span>
+              <span x-text="'Updated ' + formatTimestamp(selectedCard?.updated_at)"></span>
+            </div>
+          </div>
+
+          <div class="modal-content">
+            <textarea x-model="editCard.description" placeholder="Description" rows="6"></textarea>
+          </div>
+
+          <div class="modal-buttons">
+            <button type="submit">Save</button>
+            <button type="button" @click="cancelEditCard()">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+</html>

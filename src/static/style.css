@@ -1,0 +1,313 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #1a1a1a;
+    color: #e0e0e0;
+    padding: 2rem;
+}
+
+h1 {
+    margin-bottom: 2rem;
+    color: #fff;
+}
+
+.board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    max-width: 1400px;
+}
+
+.column {
+    background: #2a2a2a;
+    border-radius: 8px;
+    padding: 1rem;
+    min-height: 400px;
+}
+
+.column h2 {
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+    color: #fff;
+    border-bottom: 2px solid #404040;
+    padding-bottom: 0.5rem;
+}
+
+.card {
+    background: #353535;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    border-left: 3px solid #4a9eff;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.card h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+    color: #fff;
+}
+
+.card p {
+    font-size: 0.9rem;
+    color: #b0b0b0;
+    line-height: 1.4;
+}
+
+/* Add card button */
+.add-card-btn {
+    width: 100%;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    background: transparent;
+    border: 2px dashed #404040;
+    border-radius: 6px;
+    color: #666;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.add-card-btn:hover {
+    border-color: #4a9eff;
+    color: #4a9eff;
+}
+
+/* Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal {
+    background: #2a2a2a;
+    border-radius: 8px;
+    padding: 1.5rem;
+    min-width: 500px;
+    max-width: 600px;
+    width: 90%;
+    min-height: 350px;
+    max-height: 80vh;
+    border: 1px solid #404040;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modal form {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+/* Modal header with title and timestamps */
+.modal-header {
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #404040;
+}
+
+.modal h2,
+.modal h3 {
+    margin: 0 0 0.5rem 0;
+    color: #fff;
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+/* Special styling for title input in edit mode */
+.modal-title-input {
+    font-size: 1.3rem;
+    font-weight: 600;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    background: #353535;
+    border: 1px solid #404040;
+    color: #e0e0e0;
+}
+
+.modal-title-input:focus {
+    outline: none;
+    border-color: #4a9eff;
+}
+
+/* Timestamps - subtle and compact */
+.modal-timestamps {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.75rem;
+    color: #666;
+}
+
+.modal-timestamps span {
+    display: inline-block;
+}
+
+/* Main content area - grows to fill space */
+.modal-content {
+    flex-grow: 1;
+    overflow-y: auto;
+    margin: 0.5rem 0 1rem 0;
+    min-height: 120px;
+}
+
+.modal-content p {
+    color: #b0b0b0;
+    line-height: 1.6;
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* Textarea in edit mode */
+.modal-content textarea {
+    width: 100%;
+    min-height: 120px;
+    height: 100%;
+    padding: 0.75rem;
+    background: #353535;
+    border: 1px solid #404040;
+    border-radius: 6px;
+    color: #e0e0e0;
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    resize: vertical;
+}
+
+.modal-content textarea:focus {
+    outline: none;
+    border-color: #4a9eff;
+}
+
+/* Column selector */
+.column-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+    margin: 0.5rem 0;
+    border-top: 1px solid #404040;
+    border-bottom: 1px solid #404040;
+}
+
+.column-selector label {
+    color: #888;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.column-selector select {
+    flex-grow: 1;
+    background: #353535;
+    border: 1px solid #404040;
+    border-radius: 6px;
+    color: #e0e0e0;
+    padding: 0.5rem 0.75rem;
+    font-family: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.column-selector select:hover {
+    border-color: #4a9eff;
+}
+
+.column-selector select:focus {
+    outline: none;
+    border-color: #4a9eff;
+}
+
+/* Create form inputs */
+.modal input:not(.modal-title-input),
+.modal textarea {
+    width: 100%;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    background: #353535;
+    border: 1px solid #404040;
+    border-radius: 6px;
+    color: #e0e0e0;
+    font-family: inherit;
+    font-size: 0.95rem;
+}
+
+.modal input:focus,
+.modal textarea:focus {
+    outline: none;
+    border-color: #4a9eff;
+}
+
+.modal textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+/* Modal buttons */
+.modal-buttons {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+    margin-top: auto;
+    padding-top: 0.75rem;
+}
+
+.modal-buttons button {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.modal-buttons button[type="submit"] {
+    background: #4a9eff;
+    color: white;
+}
+
+.modal-buttons button[type="submit"]:hover {
+    background: #3a8eef;
+}
+
+.modal-buttons button[type="button"] {
+    background: #353535;
+    color: #b0b0b0;
+}
+
+.modal-buttons button[type="button"]:hover {
+    background: #404040;
+    color: #e0e0e0;
+}
+
+@media (max-width: 768px) {
+    .board {
+        grid-template-columns: 1fr;
+    }
+    .modal {
+        min-width: 0;
+        width: 95%;
+        max-width: 95%;
+    }
+}

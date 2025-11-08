@@ -1,0 +1,14 @@
+.{
+    .name = .kanban,
+    .version = "0.0.1",
+    .fingerprint = 0x31e5890073ea0c95,
+    .dependencies = .{
+        .http_common = .{ .path = "../http_common" },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "static",
+    },
+}
