@@ -75,7 +75,6 @@ pub const Database = struct {
                     };
                     const parsed = try std.json.parseFromSlice(TypedEntity, allocator, line, .{ .ignore_unknown_fields = true });
                     defer parsed.deinit();
-                    std.log.info("Replaying history zooooom {d}\n", .{parsed.value.data.id});
                     const entity = try parsed.value.data.clone(allocator);
                     try storage.entities.put(entity.id, entity);
                 }

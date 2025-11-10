@@ -80,6 +80,20 @@ h1 {
     line-height: 1.4;
 }
 
+/* Card drag and drop styles */
+.card[draggable="true"] {
+    cursor: grab;
+}
+
+.card[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.column.card-drag-over {
+    background: #353535;
+    border: 2px dashed #4a9eff;
+}
+
 /* Add card button */
 .add-card-btn {
     width: 100%;

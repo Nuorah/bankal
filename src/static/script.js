@@ -24,6 +24,9 @@ function kanban() {
       title: '',
       description: ''
     },
+    // Drag and drop
+    cardDraggedId: null,
+    cardDragOverColumn: null,
 
     init() {
       this.loadBoards();
@@ -178,6 +181,59 @@ function kanban() {
       // Reload cards and close modal since card moved to different board
       await this.loadCards();
       this.selectedCard = null;
+    },
+
+    onCardDragStart(cardId, event) {
+      this.cardDraggedId = cardId;
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/html', event.target.innerHTML);
+      event.target.style.opacity = 0.8;
+    },
+
+    onCardDragEnd(event) {
+      event.target.style.opacity = 1;
+      this.cardDraggedId = null;
+      this.cardDragOverColumn = null;
+    },
+
+    onCardDragOver(event) {
+      if (event.preventDefault) {
+        event.preventDefault();
+      }
+      event.dataTransfer.dropEffet = 'move';
+      return false;
+    },
+
+    onCardDragEnterColumn(columnNum, event) {
+      event.preventDefault();
+      this.cardDragOverColumn = columnNum;
+    },
+
+    onCardDragLeaveColumn() {
+      if (!event.currentTarget.contains(event.relatedTarget)) {
+        this.cardDragOverColumn = null;
+      }
+    },
+
+    async onCardDropInColumn(columnNum, event) {
+      if (event.stopPropagation) {
+        event.stopPropagation();
+      }
+
+      const draggedCard = this.cards.find(c => c.id === this.cardDraggedId);
+
+      if (draggedCard && draggedCard.column != columnNum) {
+        await fetch(`/api/cards/${this.cardDraggedId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ column: columnNum })
+        });
+
+        await this.loadCards();
+      }
+
+      this.cardDragOverColumn = null;
+      return false;
     }
   }
 }
