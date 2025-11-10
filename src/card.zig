@@ -1,18 +1,16 @@
 const std = @import("std");
 
-pub const MAGIC: [4]u8 = .{ 'K', 'B', 'A', 'N' };
-pub const VERSION: u8 = 1;
-
 pub const Card = struct {
     const Self = @This();
     pub const TYPE_NAME = "card";
-    // Metadata block (16 bytes)
+
     id: u64,
     created_at: i64,
     updated_at: i64,
     column: u8,
     title: []const u8,
     description: []const u8,
+    board_id: u8 = 0,
 
     pub fn clone(self: Card, allocator: std.mem.Allocator) !Self {
         return Card{
@@ -22,20 +20,23 @@ pub const Card = struct {
             .column = self.column,
             .title = try allocator.dupe(u8, self.title),
             .description = try allocator.dupe(u8, self.description),
+            .board_id = self.board_id,
         };
     }
 };
 
-pub const CardCreateDTO = struct {
+pub const CreationDTO = struct {
     column: u8,
     title: []const u8,
     description: []const u8,
+    board_id: u8,
 };
 
 pub const CardUpdateDTO = struct {
     column: ?u8 = null,
     title: ?[]const u8 = null,
     description: ?[]const u8 = null,
+    board_id: ?u8,
 };
 
 pub const CardResponseDTO = struct {
@@ -45,9 +46,10 @@ pub const CardResponseDTO = struct {
     column: u8,
     title: []const u8,
     description: []const u8,
+    board_id: u8,
 };
 
-pub fn toDTO(allocator: std.mem.Allocator, card: Card) !CardResponseDTO {
+pub fn toResponseDTO(allocator: std.mem.Allocator, card: Card) !CardResponseDTO {
     return CardResponseDTO{
         .id = try std.fmt.allocPrint(allocator, "{d}", .{card.id}),
         .created_at = card.created_at,
@@ -55,10 +57,11 @@ pub fn toDTO(allocator: std.mem.Allocator, card: Card) !CardResponseDTO {
         .column = card.column,
         .title = try allocator.dupe(u8, card.title),
         .description = try allocator.dupe(u8, card.description),
+        .board_id = card.board_id,
     };
 }
 
-pub fn fromDTO(allocator: std.mem.Allocator, dto: CardCreateDTO) !Card {
+pub fn fromDTO(allocator: std.mem.Allocator, dto: CreationDTO) !Card {
 
     // Generate UUID v4
     var uuid_bytes: [16]u8 = undefined;
@@ -80,6 +83,7 @@ pub fn fromDTO(allocator: std.mem.Allocator, dto: CardCreateDTO) !Card {
         .column = dto.column,
         .title = try allocator.dupe(u8, dto.title),
         .description = try allocator.dupe(u8, dto.description),
+        .board_id = dto.board_id,
     };
 }
 
@@ -97,6 +101,13 @@ pub fn updateCardFromDTO(allocator: std.mem.Allocator, card: *Card, dto: CardUpd
     if (dto.column) |column| {
         card.column = column;
         updated = true;
+    }
+
+    if (dto.board_id) |board_id| {
+        if (board_id != card.board_id) {
+            card.column = 0;
+        }
+        card.board_id = board_id;
     }
 
     if (updated) {

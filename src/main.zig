@@ -4,7 +4,7 @@ const Database = @import("database.zig").Database;
 const db = @import("db.zig");
 const card_module = @import("card.zig");
 const Card = @import("card.zig").Card;
-const CardCreateDTO = @import("card.zig").CardCreateDTO;
+const CardCreateDTO = @import("card.zig").CreationDTO;
 const CardUpdateDTO = @import("card.zig").CardUpdateDTO;
 
 const index_html = @embedFile("static/index.html");
@@ -114,7 +114,7 @@ pub fn handleGetAllCards(
     defer ctx.card_storage.mutex.unlock();
     var iter = ctx.card_storage.entities.valueIterator();
     while (iter.next()) |entity| {
-        try list.append(arena_allocator, try card_module.toDTO(arena_allocator, entity.*));
+        try list.append(arena_allocator, try card_module.toResponseDTO(arena_allocator, entity.*));
     }
 
     try json_writer.write(list.items);
@@ -175,7 +175,7 @@ pub fn handleUpdateCard(
     const parsed = try std.json.parseFromSlice(CardUpdateDTO, arena_allocator, body, .{});
 
     ctx.card_storage.mutex.lock();
-    ctx.card_storage.mutex.unlock();
+    defer ctx.card_storage.mutex.unlock();
     var card = ctx.card_storage.entities.get(id) orelse {
         try req.respond("Not found in storage", .{ .status = .not_found });
         return;
