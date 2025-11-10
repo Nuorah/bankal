@@ -1,6 +1,5 @@
 const std = @import("std");
 const http_common = @import("http_common");
-const Database = @import("database.zig").Database;
 const db = @import("db.zig");
 const card_module = @import("card.zig");
 const Card = @import("card.zig").Card;
