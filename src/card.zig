@@ -1,25 +1,29 @@
 const std = @import("std");
 
-pub const Card = extern struct {
+pub const MAGIC: [4]u8 = .{ 'K', 'B', 'A', 'N' };
+pub const VERSION: u8 = 1;
+
+pub const Card = struct {
+    const Self = @This();
+    pub const TYPE_NAME = "card";
     // Metadata block (16 bytes)
     id: u64,
     created_at: i64,
-
-    // Frequently accessed stuff (16 bytes)
     updated_at: i64,
     column: u8,
-    archived: bool,
-    title_len: u8,
-    _padding1: [5]u8 = undefined, // Align next field to 8 bytes
+    title: []const u8,
+    description: []const u8,
 
-    // Variable content (640 bytes)
-    title: [128]u8,
-    description_len: u16,
-    _padding2: [6]u8 = undefined,
-    description: [512]u8,
-
-    // Reserved for future (352 bytes)
-    _reserved: [352]u8 = undefined,
+    pub fn clone(self: Card, allocator: std.mem.Allocator) !Self {
+        return Card{
+            .id = self.id,
+            .created_at = self.created_at,
+            .updated_at = self.updated_at,
+            .column = self.column,
+            .title = try allocator.dupe(u8, self.title),
+            .description = try allocator.dupe(u8, self.description),
+        };
+    }
 };
 
 pub const CardCreateDTO = struct {
@@ -39,26 +43,22 @@ pub const CardResponseDTO = struct {
     created_at: i64,
     updated_at: i64,
     column: u8,
-    archived: bool,
     title: []const u8,
     description: []const u8,
 };
 
-pub fn toDTO(card: Card, allocator: std.mem.Allocator) !CardResponseDTO {
+pub fn toDTO(allocator: std.mem.Allocator, card: Card) !CardResponseDTO {
     return CardResponseDTO{
         .id = try std.fmt.allocPrint(allocator, "{d}", .{card.id}),
         .created_at = card.created_at,
         .updated_at = card.updated_at,
         .column = card.column,
-        .archived = card.archived,
-        .title = try allocator.dupe(u8, card.title[0..card.title_len]),
-        .description = try allocator.dupe(u8, card.description[0..card.description_len]),
+        .title = try allocator.dupe(u8, card.title),
+        .description = try allocator.dupe(u8, card.description),
     };
 }
 
-pub fn fromDTO(dto: CardCreateDTO) !Card {
-    if (dto.title.len > 128) return error.TitleTooLong;
-    if (dto.description.len > 512) return error.DescriptionTooLong;
+pub fn fromDTO(allocator: std.mem.Allocator, dto: CardCreateDTO) !Card {
 
     // Generate UUID v4
     var uuid_bytes: [16]u8 = undefined;
@@ -73,44 +73,25 @@ pub fn fromDTO(dto: CardCreateDTO) !Card {
 
     const now = std.time.timestamp();
 
-    var card: Card = .{
+    return Card{
         .id = id,
         .created_at = now,
         .updated_at = now,
         .column = dto.column,
-        .archived = false,
-        .title_len = @intCast(dto.title.len),
-        .description_len = @intCast(dto.description.len),
-        .title = undefined,
-        .description = undefined,
-        ._padding1 = undefined,
-        ._padding2 = undefined,
-        ._reserved = undefined,
+        .title = try allocator.dupe(u8, dto.title),
+        .description = try allocator.dupe(u8, dto.description),
     };
-
-    @memcpy(card.title[0..dto.title.len], dto.title);
-    @memcpy(card.description[0..dto.description.len], dto.description);
-
-    return card;
 }
 
-pub fn updateCardFromDTO(card: *Card, dto: CardUpdateDTO) !void {
+pub fn updateCardFromDTO(allocator: std.mem.Allocator, card: *Card, dto: CardUpdateDTO) !*Card {
     var updated = false;
-    if (dto.description) |description| {
-        if (description.len > 512) return error.DescriptionTooLong;
-    }
-    if (dto.title) |title| {
-        if (title.len > 128) return error.TitleTooLong;
-    }
 
     if (dto.description) |description| {
-        @memcpy(card.description[0..description.len], description);
-        card.description_len = @intCast(description.len);
+        card.description = try allocator.dupe(u8, description);
         updated = true;
     }
     if (dto.title) |title| {
-        @memcpy(card.title[0..title.len], title);
-        card.title_len = @intCast(title.len);
+        card.title = try allocator.dupe(u8, title);
         updated = true;
     }
     if (dto.column) |column| {
@@ -121,4 +102,6 @@ pub fn updateCardFromDTO(card: *Card, dto: CardUpdateDTO) !void {
     if (updated) {
         card.updated_at = std.time.timestamp();
     }
+
+    return card;
 }

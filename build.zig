@@ -4,6 +4,16 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    // Bundle frontend with Bun
+    const bundle_frontend = b.addSystemCommand(&[_][]const u8{
+        "bun",
+        "build",
+        "src/static/script.js",
+        "--outfile=src/static/dist/bundle.min.js",
+        "--minify",
+        "--target=browser",
+    });
+
     const exe = b.addExecutable(.{
         .name = "kanban",
         .root_module = b.createModule(.{
@@ -12,6 +22,8 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
+
+    exe.step.dependOn(&bundle_frontend.step);
 
     b.installArtifact(exe);
 
@@ -32,4 +44,8 @@ pub fn build(b: *std.Build) void {
 
     const run_step = b.step("run", "Run the server");
     run_step.dependOn(&run_cmd.step);
+
+    // Optional: separate step just for bundling
+    const bundle_step = b.step("bundle", "Bundle frontend assets");
+    bundle_step.dependOn(&bundle_frontend.step);
 }

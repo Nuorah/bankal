@@ -1,3 +1,5 @@
+import Alpine from 'alpinejs';
+
 function kanban() {
   return {
     cards: [],
@@ -122,3 +124,8 @@ function kanban() {
     }
   }
 }
+
+window.Alpine = Alpine;
+window.kanban = kanban;
+
+Alpine.start();
