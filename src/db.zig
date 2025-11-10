@@ -75,6 +75,7 @@ pub const Database = struct {
                     };
                     const parsed = try std.json.parseFromSlice(TypedEntity, allocator, line, .{ .ignore_unknown_fields = true });
                     defer parsed.deinit();
+                    std.log.info("Replaying history zooooom {d}\n", .{parsed.value.data.id});
                     const entity = try parsed.value.data.clone(allocator);
                     try storage.entities.put(entity.id, entity);
                 }
@@ -89,14 +90,10 @@ pub const Database = struct {
         allocator: std.mem.Allocator,
         storage: *Storage(T),
     ) !void {
-        storage.mutex.lock();
-        defer storage.mutex.unlock();
-
-        // THIS IS THE FIX - use createFile with explicit flags!
         const file = try std.fs.cwd().createFile(self.wal_path, .{
             .read = false,
-            .truncate = false, // ← KEY: don't truncate!
-            .exclusive = false, // ← KEY: allow opening existing file!
+            .truncate = false,
+            .exclusive = false,
         });
         defer file.close();
 

@@ -12,14 +12,23 @@
   <div x-data="kanban()">
     <h1>Kanban</h1>
 
+    <div class="board-tabs">
+      <template x-for="board in boards" :key="board.id">
+        <button class="board-tab" :class="{ active: currentBoardId == board.id }"
+          @click="currentBoardId = board.id; loadCards()" x-text="board.code">
+        </button>
+      </template>
+      <button class="board-tab add-board" @click="showCreateBoardForm = true">+</button>
+    </div>
+
     <div class="board">
       <div class="column">
         <h2>To do</h2>
         <button @click="showCreateForm = true; newCard.column = 0" class="add-card-btn">+</button>
         <template x-for="card in todoCards" :key="card.id">
           <div class="card" @click="selectedCard = card; isEditingCard = false">
+            <span class="card-code" x-text="card.code"></span>
             <h3 x-text="card.title"></h3>
-            <p x-text="card.description"></p>
           </div>
         </template>
       </div>
@@ -29,8 +38,8 @@
         <button @click="showCreateForm = true; newCard.column = 1" class="add-card-btn">+</button>
         <template x-for="card in inProgressCards" :key="card.id">
           <div class="card" @click="selectedCard = card; isEditingCard = false">
+            <span class="card-code" x-text="card.code"></span>
             <h3 x-text=" card.title"></h3>
-            <p x-text="card.description"></p>
           </div>
         </template>
       </div>
@@ -40,8 +49,8 @@
         <button @click="showCreateForm = true; newCard.column = 2" class="add-card-btn">+</button>
         <template x-for="card in doneCards" :key="card.id">
           <div class="card" @click="selectedCard = card; isEditingCard = false">
+            <span class="card-code" x-text="card.code"></span>
             <h3 x-text="card.title"></h3>
-            <p x-text="card.description"></p>
           </div>
         </template>
       </div>
@@ -88,6 +97,16 @@
           </select>
         </div>
 
+        <!-- Board selector dropdown -->
+        <div class="column-selector">
+          <label for="board-select">Move to board:</label>
+          <select id="board-select" :value="selectedCard?.board_id" @change="moveCardToBoard($event.target.value)">
+            <template x-for="board in boards" :key="board.id">
+              <option :value="board.id" x-text="board.name"></option>
+            </template>
+          </select>
+        </div>
+
         <div class="modal-buttons">
           <button type="button" @click="startEditingCard()">Edit</button>
           <button type="button" @click="selectedCard = null">Close</button>
@@ -119,6 +138,23 @@
         </form>
       </div>
     </div>
+
+    <div x-show="showCreateBoardForm" @click.self="showCreateBoardForm = false" class="modal-overlay">
+      <div class="modal">
+        <h2>New Board</h2>
+        <form @submit.prevent="createBoard">
+          <input type="text" x-model="newBoard.name" placeholder="Board Name" required>
+          <input type="text" x-model="newBoard.code" placeholder="Code (e.g., DEV)" required>
+          <textarea x-model="newBoard.description" placeholder="Description" rows="3"></textarea>
+          <div class="modal-buttons">
+            <button type="submit">Create</button>
+            <button type="button" @click="showCreateBoardForm = false">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+
 
     <script src="/static/dist/bundle.min.js"></script>
 </body>

@@ -4,7 +4,7 @@ pub const Board = struct {
     const Self = @This();
     pub const TYPE_NAME = "board";
 
-    id: u64,
+    id: u8,
     next_card_number: u64,
     name: []const u8,
     code: []const u8,
@@ -14,7 +14,6 @@ pub const Board = struct {
         return Board{
             .id = self.id,
             .next_card_number = self.next_card_number,
-            .column = self.column,
             .name = try allocator.dupe(u8, self.name),
             .code = try allocator.dupe(u8, self.code),
             .description = try allocator.dupe(u8, self.description),
@@ -35,7 +34,7 @@ pub const BoardUpdateDTO = struct {
 };
 
 pub const BoardResponseDTO = struct {
-    id: []const u8,
+    id: u8,
     name: []const u8,
     code: []const u8,
     description: []const u8,
@@ -43,9 +42,19 @@ pub const BoardResponseDTO = struct {
 
 pub fn toResponseDTO(allocator: std.mem.Allocator, board: Board) !BoardResponseDTO {
     return BoardResponseDTO{
-        .id = try std.fmt.allocPrint(allocator, "{d}", .{board.id}),
+        .id = board.id,
         .name = try allocator.dupe(u8, board.name),
         .code = try allocator.dupe(u8, board.code),
         .description = try allocator.dupe(u8, board.description),
+    };
+}
+
+pub fn fromCreateDTO(allocator: std.mem.Allocator, dto: BoardCreateDTO, id: u8) !Board {
+    return Board{
+        .id = id,
+        .code = try allocator.dupe(u8, dto.code),
+        .description = try allocator.dupe(u8, dto.description),
+        .name = try allocator.dupe(u8, dto.name),
+        .next_card_number = 1,
     };
 }

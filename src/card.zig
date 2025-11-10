@@ -1,4 +1,5 @@
 const std = @import("std");
+const board = @import("board.zig");
 
 pub const Card = struct {
     const Self = @This();
@@ -11,6 +12,7 @@ pub const Card = struct {
     title: []const u8,
     description: []const u8,
     board_id: u8 = 0,
+    code: []const u8,
 
     pub fn clone(self: Card, allocator: std.mem.Allocator) !Self {
         return Card{
@@ -21,6 +23,7 @@ pub const Card = struct {
             .title = try allocator.dupe(u8, self.title),
             .description = try allocator.dupe(u8, self.description),
             .board_id = self.board_id,
+            .code = try allocator.dupe(u8, self.code),
         };
     }
 };
@@ -36,7 +39,7 @@ pub const CardUpdateDTO = struct {
     column: ?u8 = null,
     title: ?[]const u8 = null,
     description: ?[]const u8 = null,
-    board_id: ?u8,
+    board_id: ?u8 = null,
 };
 
 pub const CardResponseDTO = struct {
@@ -47,6 +50,7 @@ pub const CardResponseDTO = struct {
     title: []const u8,
     description: []const u8,
     board_id: u8,
+    code: []const u8,
 };
 
 pub fn toResponseDTO(allocator: std.mem.Allocator, card: Card) !CardResponseDTO {
@@ -58,11 +62,11 @@ pub fn toResponseDTO(allocator: std.mem.Allocator, card: Card) !CardResponseDTO 
         .title = try allocator.dupe(u8, card.title),
         .description = try allocator.dupe(u8, card.description),
         .board_id = card.board_id,
+        .code = try allocator.dupe(u8, card.code),
     };
 }
 
-pub fn fromDTO(allocator: std.mem.Allocator, dto: CreationDTO) !Card {
-
+pub fn fromDTO(allocator: std.mem.Allocator, dto: CreationDTO, board_entity: board.Board) !Card {
     // Generate UUID v4
     var uuid_bytes: [16]u8 = undefined;
     std.crypto.random.bytes(&uuid_bytes);
@@ -76,6 +80,8 @@ pub fn fromDTO(allocator: std.mem.Allocator, dto: CreationDTO) !Card {
 
     const now = std.time.timestamp();
 
+    const code = try std.fmt.allocPrint(allocator, "{s}-{d}", .{ board_entity.code, board_entity.next_card_number });
+
     return Card{
         .id = id,
         .created_at = now,
@@ -83,36 +89,41 @@ pub fn fromDTO(allocator: std.mem.Allocator, dto: CreationDTO) !Card {
         .column = dto.column,
         .title = try allocator.dupe(u8, dto.title),
         .description = try allocator.dupe(u8, dto.description),
-        .board_id = dto.board_id,
+        .board_id = board_entity.id,
+        .code = try allocator.dupe(u8, code),
     };
 }
 
-pub fn updateCardFromDTO(allocator: std.mem.Allocator, card: *Card, dto: CardUpdateDTO) !*Card {
+pub fn updateCardFromDTO(allocator: std.mem.Allocator, card: *Card, dto: CardUpdateDTO, board_entity: ?board.Board) !*Card {
     var updated = false;
+    var new_card = try card.clone(allocator);
 
     if (dto.description) |description| {
-        card.description = try allocator.dupe(u8, description);
+        new_card.description = try allocator.dupe(u8, description);
         updated = true;
     }
     if (dto.title) |title| {
-        card.title = try allocator.dupe(u8, title);
+        new_card.title = try allocator.dupe(u8, title);
         updated = true;
     }
     if (dto.column) |column| {
-        card.column = column;
+        new_card.column = column;
         updated = true;
     }
 
     if (dto.board_id) |board_id| {
         if (board_id != card.board_id) {
-            card.column = 0;
+            if (board_entity) |board_entity_real| {
+                new_card.column = 0;
+                new_card.code = try std.fmt.allocPrint(allocator, "{s}-{d}", .{ board_entity_real.code, board_entity_real.next_card_number });
+            }
         }
-        card.board_id = board_id;
+        new_card.board_id = board_id;
     }
 
     if (updated) {
-        card.updated_at = std.time.timestamp();
+        new_card.updated_at = std.time.timestamp();
     }
 
-    return card;
+    return &new_card;
 }

@@ -2,6 +2,14 @@ import Alpine from 'alpinejs';
 
 function kanban() {
   return {
+    boards: [],
+    currentBoardId: 0,
+    showCreateBoardForm: false,
+    newBoard: {
+      name: '',
+      code: '',
+      description: '',
+    },
     cards: [],
     showCreateForm: false,
     selectedCard: null,
@@ -18,6 +26,7 @@ function kanban() {
     },
 
     init() {
+      this.loadBoards();
       this.loadCards();
     },
 
@@ -51,9 +60,37 @@ function kanban() {
       return ts ? new Date(ts * 1000).toLocaleString() : "";
     },
 
+    async loadBoards() {
+      try {
+        const response = await fetch('/api/boards');
+        if (!response.ok) {
+          console.error('Failed to load boards:', response.status);
+        }
+        this.boards = await response.json();
+      } catch (error) {
+        console.error('Error loading boards:', error);
+      }
+    },
+
+    async createBoard() {
+      await fetch('api/boards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: this.newBoard.name,
+          code: this.newBoard.code,
+          description: this.newBoard.description
+        })
+      });
+
+      this.newBoard = { name: '', code: '', description: '' };
+      this.showCreateBoardForm = false;
+      await this.loadBoards();
+    },
+
     async loadCards() {
       try {
-        const response = await fetch('/api/cards');
+        const response = await fetch(`/api/boards/${this.currentBoardId}/cards`);
         if (!response.ok) {
           console.error('Failed to load cards:', response.status);
           return;
@@ -73,7 +110,8 @@ function kanban() {
         body: JSON.stringify({
           column: this.newCard.column,
           title: this.newCard.title,
-          description: this.newCard.description
+          description: this.newCard.description,
+          board_id: this.currentBoardId,
         })
       });
 
@@ -121,6 +159,25 @@ function kanban() {
 
       await this.loadCards();
       this.selectedCard = this.cards.find(c => c.id === cardId);
+    },
+
+    async moveCardToBoard(newBoardId) {
+      const boardId = parseInt(newBoardId, 10);
+
+      // Don't do anything if it's the same board
+      if (this.selectedCard.board_id === boardId) return;
+
+      const cardId = this.selectedCard.id;
+
+      await fetch(`/api/cards/${cardId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ board_id: boardId })
+      });
+
+      // Reload cards and close modal since card moved to different board
+      await this.loadCards();
+      this.selectedCard = null;
     }
   }
 }

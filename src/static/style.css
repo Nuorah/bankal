@@ -38,6 +38,27 @@ h1 {
     padding-bottom: 0.5rem;
 }
 
+.card-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.card-code {
+    font-size: 0.75rem;
+    color: #4a9eff;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.card h3 {
+    font-size: 1rem;
+    margin: 0;
+    color: #fff;
+    line-height: 1.3;
+}
+
 .card {
     background: #353535;
     border-radius: 6px;
@@ -51,12 +72,6 @@ h1 {
 .card:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.card h3 {
-    font-size: 1rem;
-    margin-bottom: 0.5rem;
-    color: #fff;
 }
 
 .card p {
@@ -299,6 +314,41 @@ h1 {
 .modal-buttons button[type="button"]:hover {
     background: #404040;
     color: #e0e0e0;
+}
+
+.board-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid #404040;
+  padding-bottom: 0;
+}
+
+.board-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: #888;
+  padding: 0.75rem 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.95rem;
+}
+
+.board-tab:hover {
+  color: #e0e0e0;
+  border-bottom-color: #4a9eff;
+}
+
+.board-tab.active {
+  color: #fff;
+  border-bottom-color: #4a9eff;
+}
+
+.board-tab.add-board {
+  color: #666;
+  font-size: 1.3rem;
+  padding: 0.5rem 1rem;
 }
 
 @media (max-width: 768px) {
