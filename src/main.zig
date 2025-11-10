@@ -345,7 +345,7 @@ pub fn handleUpdateCard(
 
     const updated_card = try card_module.updateCardFromDTO(main_allocator, &card, parsed.value, board_entity);
 
-    try ctx.db.append(Card, updated_card.*, main_allocator, ctx.card_storage);
+    try ctx.db.append(Card, updated_card, main_allocator, ctx.card_storage);
     ctx.card_storage.mutex.unlock();
 
     try req.respond("", .{ .status = .no_content });

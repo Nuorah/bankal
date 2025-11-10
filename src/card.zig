@@ -94,7 +94,7 @@ pub fn fromDTO(allocator: std.mem.Allocator, dto: CreationDTO, board_entity: boa
     };
 }
 
-pub fn updateCardFromDTO(allocator: std.mem.Allocator, card: *Card, dto: CardUpdateDTO, board_entity: ?board.Board) !*Card {
+pub fn updateCardFromDTO(allocator: std.mem.Allocator, card: *Card, dto: CardUpdateDTO, board_entity: ?board.Board) !Card {
     var updated = false;
     var new_card = try card.clone(allocator);
 
@@ -125,5 +125,5 @@ pub fn updateCardFromDTO(allocator: std.mem.Allocator, card: *Card, dto: CardUpd
         new_card.updated_at = std.time.timestamp();
     }
 
-    return &new_card;
+    return new_card;
 }
