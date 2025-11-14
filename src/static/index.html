@@ -22,47 +22,21 @@
     </div>
 
     <div class="board">
-      <div class="column" :class="{ 'card-drag-over': cardDragOverColumn === 0 }"
-        @dragover.prevent="onCardDragOver($event)" @dragenter="onCardDragEnterColumn(0, $event)"
-        @dragleave="onCardDragLeaveColumn(0, $event)" @drop="onCardDropInColumn(0, $event)">
-        <h2>To do</h2>
-        <button @click="showCreateForm = true; newCard.column = 0" class="add-card-btn">+</button>
-        <template x-for="card in todoCards" :key="card.id">
-          <div class="card" draggable="true" @dragstart="onCardDragStart(card.id, $event)"
-            @dragend="onCardDragEnd($event)" @click="selectedCard = card; isEditingCard = false">
-            <span class="card-code" x-text="card.code"></span>
-            <h3 x-text="card.title"></h3>
-          </div>
-        </template>
-      </div>
-
-      <div class="column" :class="{ 'card-drag-over': cardDragOverColumn === 1 }"
-        @dragover.prevent="onCardDragOver($event)" @dragenter="onCardDragEnterColumn(1, $event)"
-        @dragleave="onCardDragLeaveColumn(1, $event)" @drop="onCardDropInColumn(1, $event)">
-        <h2>In Progress</h2>
-        <button @click="showCreateForm = true; newCard.column = 1" class="add-card-btn">+</button>
-        <template x-for="card in inProgressCards" :key="card.id">
-          <div class="card" draggable="true" @dragstart="onCardDragStart(card.id, $event)"
-            @dragend="onCardDragEnd($event)" @click="selectedCard = card; isEditingCard = false">
-            <span class="card-code" x-text="card.code"></span>
-            <h3 x-text=" card.title"></h3>
-          </div>
-        </template>
-      </div>
-
-      <div class="column" :class="{ 'card-drag-over': cardDragOverColumn === 2 }"
-        @dragover.prevent="onCardDragOver($event)" @dragenter="onCardDragEnterColumn(2, $event)"
-        @dragleave="onCardDragLeaveColumn(2, $event)" @drop="onCardDropInColumn(2, $event)">
-        <h2>Done</h2>
-        <button @click="showCreateForm = true; newCard.column = 2" class="add-card-btn">+</button>
-        <template x-for="card in doneCards" :key="card.id">
-          <div class="card" draggable="true" @dragstart="onCardDragStart(card.id, $event)"
-            @dragend="onCardDragEnd($event)" @click="selectedCard = card; isEditingCard = false">
-            <span class="card-code" x-text="card.code"></span>
-            <h3 x-text="card.title"></h3>
-          </div>
-        </template>
-      </div>
+      <template x-for="column in currentBoard?.columns || []" :key="column.id">
+        <div class="column" :class="{ 'card-drag-over': cardDragOverColumn === column.id }"
+          @dragover.prevent="onCardDragOver($event)" @dragenter="onCardDragEnterColumn(column.id, $event)"
+          @dragleave="onCardDragLeaveColumn(column.id, $event)" @drop="onCardDropInColumn(column.id, $event)">
+          <h2 x-text="column.name"></h2>
+          <button @click="showCreateForm = true; newCard.column = column.id" class="add-card-btn">+</button>
+          <template x-for="card in cardsForColumn(column.id)" :key="card.id">
+            <div class="card" draggable="true" @dragstart="onCardDragStart(card.id, $event)"
+              @dragend="onCardDragEnd($event)" @click="selectedCard = card; isEditingCard = false">
+              <span class="card-code" x-text="card.code"></span>
+              <h3 x-text="card.title"></h3>
+            </div>
+          </template>
+        </div>
+      </template>
     </div>
 
     <!-- Create card modal -->
@@ -100,9 +74,9 @@
         <div class="column-selector">
           <label for="column-select">Move to:</label>
           <select id="column-select" :value="selectedCard?.column" @change="moveCardToColumn($event.target.value)">
-            <option value="0">To do</option>
-            <option value="1">In Progress</option>
-            <option value="2">Done</option>
+            <template x-for="column in currentBoard?.columns || []" :key="column.id">
+              <option :value="column.id" x-text="column.name"></option>
+            </template>
           </select>
         </div>
 

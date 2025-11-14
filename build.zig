@@ -23,6 +23,8 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    exe.linkLibC();
+
     exe.step.dependOn(&bundle_frontend.step);
 
     b.installArtifact(exe);

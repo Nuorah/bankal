@@ -33,16 +33,12 @@ function kanban() {
       this.loadCards();
     },
 
-    get todoCards() {
-      return this.cards.filter(card => card.column === 0);
+    get currentBoard() {
+      return this.boards.find(b => b.id === this.currentBoardId);
     },
 
-    get inProgressCards() {
-      return this.cards.filter(card => card.column === 1);
-    },
-
-    get doneCards() {
-      return this.cards.filter(card => card.column === 2);
+    cardsForColumn(columnId) {
+      return this.cards.filter(card => card.column === columnId);
     },
 
     startEditingCard() {
@@ -148,13 +144,14 @@ function kanban() {
     async moveCardToColumn(newColumn) {
       // Convert string to number (select returns strings)
       const columnNum = parseInt(newColumn, 10);
+      console.log("COUCOU");
 
       // Don't do anything if it's the same column
       if (this.selectedCard.column === columnNum) return;
 
       const cardId = this.selectedCard.id;
 
-      await fetch(`/api/cards/${cardId}`, {
+      await fetch(`/api/cards/${cardId}/column`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ column: columnNum })
@@ -172,7 +169,7 @@ function kanban() {
 
       const cardId = this.selectedCard.id;
 
-      await fetch(`/api/cards/${cardId}`, {
+      await fetch(`/api/cards/${cardId}/board`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ board_id: boardId })
@@ -223,7 +220,7 @@ function kanban() {
       const draggedCard = this.cards.find(c => c.id === this.cardDraggedId);
 
       if (draggedCard && draggedCard.column != columnNum) {
-        await fetch(`/api/cards/${this.cardDraggedId}`, {
+        await fetch(`/api/cards/${this.cardDraggedId}/column`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ column: columnNum })

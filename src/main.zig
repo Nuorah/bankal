@@ -1,11 +1,11 @@
 const std = @import("std");
 const http_common = @import("http_common");
 const db = @import("db.zig");
-const card_module = @import("card.zig");
-const Card = @import("card.zig").Card;
-const CardCreateDTO = @import("card.zig").CreationDTO;
-const CardUpdateDTO = @import("card.zig").CardUpdateDTO;
-const board = @import("board.zig");
+const event = @import("event.zig");
+const dto = @import("dto.zig");
+const model = @import("model.zig");
+
+const Response = @import("http_common").Router.Response;
 
 const index_html = @embedFile("static/index.html");
 const style_css = @embedFile("static/style.css");
@@ -21,8 +21,8 @@ const config: http_common.Server.ServerConfiguration = .{
 
 const Context = struct {
     db: db.Database,
-    card_storage: *db.Storage(Card),
-    board_storage: *db.Storage(board.Board),
+    card_storage: *db.Storage(model.Card),
+    board_storage: *db.Storage(model.Board),
 };
 
 const MAX_REQUEST_BODY_SIZE = 8192;
@@ -33,6 +33,8 @@ const routes = [_]http_common.Router.Route(Context){
     .{ .method = .GET, .path = "/static", .handler = handleStaticFile, .match = .prefix },
 
     .{ .method = .PATCH, .path = "/api/cards/:id", .handler = handleUpdateCard, .match = .pattern },
+    .{ .method = .PATCH, .path = "/api/cards/:id/column", .handler = handleUpdateCardColumn, .match = .pattern },
+    .{ .method = .PATCH, .path = "/api/cards/:id/board", .handler = handleUpdateCardBoard, .match = .pattern },
     .{ .method = .GET, .path = "/api/cards", .handler = handleGetAllCards },
     .{ .method = .POST, .path = "/api/cards", .handler = handleCreateCard },
 
@@ -44,27 +46,33 @@ const routes = [_]http_common.Router.Route(Context){
 const app_router = http_common.Router.Router(Context, &routes);
 
 pub fn main() !void {
+    std.log.info("Starting server", .{});
     const start_time = std.time.nanoTimestamp();
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{ .thread_safe = true }){}; // /!\ Thread safe allocator is very recommended
-    defer _ = gpa.deinit();
-    const main_allocator = gpa.allocator();
+    const main_allocator = std.heap.c_allocator;
 
-    var card_storage = db.Storage(Card).init(main_allocator);
-    var board_storage = db.Storage(board.Board).init(main_allocator);
+    var card_storage = db.Storage(model.Card).init(main_allocator);
+    var board_storage = db.Storage(model.Board).init(main_allocator);
 
-    var database = db.Database{ .wal_path = "kanban.wal" };
+    var database = try db.Database.init("kanban.wal");
+    defer database.deinit();
 
-    try database.load(main_allocator, .{ &card_storage, &board_storage });
+    try database.loadAllEvents(main_allocator, &card_storage, &board_storage);
     if (board_storage.entities.get(0)) |_| {} else {
-        try database.append(board.Board, board.Board{
-            .code = "MAIN",
-            .description = "Main, default board",
-            .id = 0,
-            .name = "Main",
-            .next_card_number = 1,
-        }, main_allocator, &board_storage);
+        const create_main_board: event.Event = .{
+            .timestamp = std.time.timestamp(),
+            .data = .{
+                .board_created = .{
+                    .code = "MAIN",
+                    .description = "Main board",
+                    .name = "Main",
+                },
+            },
+        };
+
+        try database.appendEvent(main_allocator, main_allocator, create_main_board, &card_storage, &board_storage);
     }
+
     var context: Context = .{
         .card_storage = &card_storage,
         .board_storage = &board_storage,
@@ -83,21 +91,24 @@ fn handleHealthCheck(
     _: std.mem.Allocator,
     _: std.mem.Allocator,
     _: *Context,
-    req: *std.http.Server.Request,
+    _: *std.http.Server.Request,
     _: std.StringHashMap([]const u8),
     _: std.StringHashMap([]const u8),
-) !void {
-    try req.respond("", .{});
+) !Response {
+    return Response{
+        .body = "",
+        .status = .ok,
+    };
 }
 
 fn handleStaticFile(
     _: std.mem.Allocator,
-    _: std.mem.Allocator,
+    arena_allocator: std.mem.Allocator,
     _: *Context,
     req: *std.http.Server.Request,
     _: std.StringHashMap([]const u8),
     _: std.StringHashMap([]const u8),
-) !void {
+) !Response {
     const path = req.head.target;
 
     const content = if (std.mem.eql(u8, path, "/") or std.mem.eql(u8, path, "/index.html"))
@@ -107,8 +118,10 @@ fn handleStaticFile(
     else if (std.mem.eql(u8, path, "/static/dist/bundle.min.js"))
         bundle_js
     else {
-        try req.respond("Not found", .{ .status = .not_found });
-        return;
+        return Response{
+            .body = "Not found",
+            .status = .not_found,
+        };
     };
 
     const content_type = if (std.mem.endsWith(u8, path, ".html") or std.mem.eql(u8, path, "/"))
@@ -120,21 +133,25 @@ fn handleStaticFile(
     else
         "application/octet-stream";
 
-    try req.respond(content, .{
-        .extra_headers = &.{
-            .{ .name = "content-type", .value = content_type },
-        },
-    });
+    const headers_on_stack = &[_]std.http.Header{
+        .{ .name = "content-type", .value = content_type },
+    };
+
+    return Response{
+        .body = content,
+        .status = .ok,
+        .extra_headers = try arena_allocator.dupe(std.http.Header, headers_on_stack),
+    };
 }
 
 pub fn handleGetAllCards(
     _: std.mem.Allocator,
     arena_allocator: std.mem.Allocator,
     ctx: *Context,
-    req: *std.http.Server.Request,
+    _: *std.http.Server.Request,
     _: std.StringHashMap([]const u8),
     _: std.StringHashMap([]const u8),
-) !void {
+) !Response {
     var allocating_writer: std.io.Writer.Allocating = .init(arena_allocator);
     defer allocating_writer.deinit();
 
@@ -143,48 +160,142 @@ pub fn handleGetAllCards(
         .options = .{ .emit_strings_as_arrays = false, .whitespace = .minified },
     };
 
-    var list: std.ArrayList(card_module.CardResponseDTO) = .empty;
+    var list: std.ArrayList(dto.Card) = .empty;
     ctx.card_storage.mutex.lock();
     defer ctx.card_storage.mutex.unlock();
     var iter = ctx.card_storage.entities.valueIterator();
     while (iter.next()) |entity| {
-        try list.append(arena_allocator, try card_module.toResponseDTO(arena_allocator, entity.*));
+        try list.append(arena_allocator, try dto.Card.toDTO(arena_allocator, entity.*));
     }
 
     try json_writer.write(list.items);
+    try json_writer.writer.flush();
 
-    // Get the bytes
     const json_bytes = allocating_writer.written();
+    return Response.json(try arena_allocator.dupe(u8, json_bytes));
+}
 
-    try req.respond(json_bytes, .{
-        .extra_headers = &.{
-            .{ .name = "content-type", .value = "application/json" },
+pub fn handleUpdateCardColumn(
+    main_allocator: std.mem.Allocator,
+    arena_allocator: std.mem.Allocator,
+    ctx: *Context,
+    req: *std.http.Server.Request,
+    path_params: std.StringHashMap([]const u8),
+    _: std.StringHashMap([]const u8),
+) !Response {
+    const id = try parseCardId(path_params);
+
+    const card = ctx.card_storage.entities.get(id) orelse {
+        return Response{
+            .body = "Card not found",
+            .status = .not_found,
+        };
+    };
+
+    const body = try readBody(arena_allocator, req);
+    const parsed = try std.json.parseFromSlice(dto.CardUpdateColumn, arena_allocator, body, .{});
+    defer parsed.deinit();
+
+    // Idempotency check
+    if (card.column == parsed.value.column) {
+        return Response{
+            .body = "",
+            .status = .no_content,
+        };
+    }
+
+    const evt = event.Event{
+        .timestamp = std.time.timestamp(),
+        .data = .{
+            .card_moved_column = .{
+                .id = id,
+                .column = parsed.value.column,
+            },
         },
-    });
+    };
+
+    try ctx.db.appendEvent(main_allocator, arena_allocator, evt, ctx.card_storage, ctx.board_storage);
+    return Response{
+        .body = "",
+        .status = .no_content,
+    };
+}
+
+pub fn handleUpdateCardBoard(
+    main_allocator: std.mem.Allocator,
+    arena_allocator: std.mem.Allocator,
+    ctx: *Context,
+    req: *std.http.Server.Request,
+    path_params: std.StringHashMap([]const u8),
+    _: std.StringHashMap([]const u8),
+) !Response {
+    const id = try parseCardId(path_params);
+
+    const card = ctx.card_storage.entities.get(id) orelse {
+        return Response{
+            .body = "Card not found",
+            .status = .not_found,
+        };
+    };
+
+    const body = try readBody(arena_allocator, req);
+    const parsed = try std.json.parseFromSlice(dto.CardUpdateBoard, arena_allocator, body, .{});
+    defer parsed.deinit();
+
+    // Check target board exists
+    _ = ctx.board_storage.entities.get(parsed.value.board_id) orelse {
+        return Response{
+            .body = "Board not found",
+            .status = .not_found,
+        };
+    };
+
+    // Idempotency check
+    if (card.board_id == parsed.value.board_id) {
+        return Response{
+            .body = "",
+            .status = .no_content,
+        };
+    }
+
+    const evt = event.Event{
+        .timestamp = std.time.timestamp(),
+        .data = .{
+            .card_moved_board = .{
+                .card_id = id,
+                .board_id = parsed.value.board_id,
+            },
+        },
+    };
+
+    try ctx.db.appendEvent(main_allocator, arena_allocator, evt, ctx.card_storage, ctx.board_storage);
+    return Response{
+        .body = "",
+        .status = .no_content,
+    };
 }
 
 pub fn handleGetAllBoards(
     _: std.mem.Allocator,
     arena_allocator: std.mem.Allocator,
     ctx: *Context,
-    req: *std.http.Server.Request,
+    _: *std.http.Server.Request,
     _: std.StringHashMap([]const u8),
     _: std.StringHashMap([]const u8),
-) !void {
+) !Response {
     var allocating_writer: std.io.Writer.Allocating = .init(arena_allocator);
-    defer allocating_writer.deinit();
 
     var json_writer: std.json.Stringify = .{
         .writer = &allocating_writer.writer,
         .options = .{ .emit_strings_as_arrays = false, .whitespace = .minified },
     };
 
-    var list: std.ArrayList(board.BoardResponseDTO) = .empty;
+    var list: std.ArrayList(dto.Board) = .empty;
     ctx.board_storage.mutex.lock();
     defer ctx.board_storage.mutex.unlock();
     var iter = ctx.board_storage.entities.valueIterator();
     while (iter.next()) |entity| {
-        try list.append(arena_allocator, try board.toResponseDTO(arena_allocator, entity.*));
+        try list.append(arena_allocator, try dto.Board.toDTO(arena_allocator, entity.*));
     }
 
     try json_writer.write(list.items);
@@ -192,21 +303,17 @@ pub fn handleGetAllBoards(
     // Get the bytes
     const json_bytes = allocating_writer.written();
 
-    try req.respond(json_bytes, .{
-        .extra_headers = &.{
-            .{ .name = "content-type", .value = "application/json" },
-        },
-    });
+    return Response.json(try arena_allocator.dupe(u8, json_bytes));
 }
 
 pub fn handleGetAllBoardCards(
     _: std.mem.Allocator,
     arena_allocator: std.mem.Allocator,
     ctx: *Context,
-    req: *std.http.Server.Request,
+    _: *std.http.Server.Request,
     path_params: std.StringHashMap([]const u8),
     _: std.StringHashMap([]const u8),
-) !void {
+) !Response {
     var allocating_writer: std.io.Writer.Allocating = .init(arena_allocator);
     defer allocating_writer.deinit();
 
@@ -216,23 +323,27 @@ pub fn handleGetAllBoardCards(
     };
 
     const id_str = path_params.get("id") orelse {
-        try req.respond("Missing id path param", .{ .status = .bad_request });
-        return;
+        return Response{
+            .body = "Missing id path param",
+            .status = .bad_request,
+        };
     };
 
     const id = std.fmt.parseInt(u64, id_str, 10) catch |err| {
         std.log.debug("Error parsing id: {}", .{err});
-        try req.respond("Invalid id format", .{ .status = .bad_request });
-        return;
+        return Response{
+            .body = "Invalid id format",
+            .status = .bad_request,
+        };
     };
 
-    var list: std.ArrayList(card_module.CardResponseDTO) = .empty;
+    var list: std.ArrayList(dto.Card) = .empty;
     ctx.card_storage.mutex.lock();
     defer ctx.card_storage.mutex.unlock();
     var iter = ctx.card_storage.entities.valueIterator();
     while (iter.next()) |entity| {
         if (entity.board_id == id) {
-            try list.append(arena_allocator, try card_module.toResponseDTO(arena_allocator, entity.*));
+            try list.append(arena_allocator, try dto.Card.toDTO(arena_allocator, entity.*));
         }
     }
 
@@ -241,11 +352,7 @@ pub fn handleGetAllBoardCards(
     // Get the bytes
     const json_bytes = allocating_writer.written();
 
-    try req.respond(json_bytes, .{
-        .extra_headers = &.{
-            .{ .name = "content-type", .value = "application/json" },
-        },
-    });
+    return Response.json(try arena_allocator.dupe(u8, json_bytes));
 }
 
 pub fn handleCreateBoard(
@@ -255,28 +362,29 @@ pub fn handleCreateBoard(
     req: *std.http.Server.Request,
     _: std.StringHashMap([]const u8),
     _: std.StringHashMap([]const u8),
-) !void {
+) !Response {
     const body = try readBody(arena_allocator, req);
 
-    const parsed = try std.json.parseFromSlice(board.BoardCreateDTO, arena_allocator, body, .{});
+    const parsed = try std.json.parseFromSlice(dto.BoardCreate, arena_allocator, body, .{});
     defer parsed.deinit();
 
-    var iter = ctx.board_storage.entities.valueIterator();
-    var id: u8 = 0;
+    // Create event
+    const evt = event.Event{
+        .timestamp = std.time.timestamp(),
+        .data = .{
+            .board_created = .{
+                .name = parsed.value.name,
+                .code = parsed.value.code,
+                .description = parsed.value.description,
+            },
+        },
+    };
 
-    while (iter.next()) |board_entity| {
-        if (board_entity.id > id) id = board_entity.id;
-    }
-
-    id = id + 1;
-
-    const board_entity = try board.fromCreateDTO(main_allocator, parsed.value, id);
-
-    try ctx.db.append(board.Board, board_entity, main_allocator, ctx.board_storage);
-
-    try req.respond("Created", .{
+    try ctx.db.appendEvent(main_allocator, arena_allocator, evt, ctx.card_storage, ctx.board_storage);
+    return Response{
+        .body = "Created",
         .status = .created,
-    });
+    };
 }
 
 pub fn handleCreateCard(
@@ -286,22 +394,48 @@ pub fn handleCreateCard(
     req: *std.http.Server.Request,
     _: std.StringHashMap([]const u8),
     _: std.StringHashMap([]const u8),
-) !void {
+) !Response {
     const body = try readBody(arena_allocator, req);
 
-    const parsed = try std.json.parseFromSlice(CardCreateDTO, arena_allocator, body, .{});
+    const parsed = try std.json.parseFromSlice(dto.CardCreate, arena_allocator, body, .{});
     defer parsed.deinit();
 
-    var board_entity = ctx.board_storage.entities.get(parsed.value.board_id) orelse return error.InvalidBoard;
-    const card = try card_module.fromDTO(main_allocator, parsed.value, board_entity);
-    board_entity.next_card_number += 1;
-    try ctx.db.append(board.Board, board_entity, main_allocator, ctx.board_storage);
+    var uuid_bytes: [16]u8 = undefined;
+    std.crypto.random.bytes(&uuid_bytes);
+    uuid_bytes[6] = (uuid_bytes[6] & 0x0f) | 0x40;
+    uuid_bytes[8] = (uuid_bytes[8] & 0x3f) | 0x80;
+    const card_id = std.mem.readInt(u64, uuid_bytes[0..8], .little);
 
-    try ctx.db.append(Card, card, main_allocator, ctx.card_storage);
+    const evt = event.Event{
+        .timestamp = std.time.timestamp(),
+        .data = .{
+            .card_created = .{
+                .id = card_id,
+                .board_id = parsed.value.board_id,
+                .column = parsed.value.column,
+                .title = parsed.value.title,
+                .description = parsed.value.description,
+            },
+        },
+    };
 
-    try req.respond("Created", .{
+    ctx.db.appendEvent(main_allocator, arena_allocator, evt, ctx.card_storage, ctx.board_storage) catch |err| {
+        if (err == error.BoardNotFound) {
+            return Response{
+                .body = "Board not found",
+                .status = .not_found,
+            };
+        }
+        std.log.err("Unexpected error: {}", .{err});
+        return Response{
+            .body = "Internal server error",
+            .status = .internal_server_error,
+        };
+    };
+    return Response{
+        .body = "Created",
         .status = .created,
-    });
+    };
 }
 
 pub fn handleUpdateCard(
@@ -311,47 +445,46 @@ pub fn handleUpdateCard(
     req: *std.http.Server.Request,
     path_params: std.StringHashMap([]const u8),
     _: std.StringHashMap([]const u8),
-) !void {
-    const id_str = path_params.get("id") orelse {
-        try req.respond("Missing id path param", .{ .status = .bad_request });
-        return;
-    };
+) !Response {
+    const id = try parseCardId(path_params);
 
-    const id = std.fmt.parseInt(u64, id_str, 10) catch |err| {
-        std.log.debug("Error parsing id: {}", .{err});
-        try req.respond("Invalid id format", .{ .status = .bad_request });
-        return;
+    _ = ctx.card_storage.entities.get(id) orelse {
+        return Response{
+            .body = "Card not found",
+            .status = .not_found,
+        };
     };
 
     const body = try readBody(arena_allocator, req);
+    const parsed = try std.json.parseFromSlice(dto.CardUpdate, arena_allocator, body, .{});
+    defer parsed.deinit();
 
-    const parsed = try std.json.parseFromSlice(CardUpdateDTO, arena_allocator, body, .{ .ignore_unknown_fields = true });
-
-    var board_entity: ?board.Board = null;
-
-    if (parsed.value.board_id) |board_id| {
-        board_entity = ctx.board_storage.entities.get(board_id) orelse return error.InvalidBoard;
-        board_entity.?.next_card_number += 1;
-        try ctx.db.append(board.Board, board_entity.?, main_allocator, ctx.board_storage);
-    }
-
-    ctx.card_storage.mutex.lock();
-    errdefer ctx.card_storage.mutex.unlock();
-    var card = ctx.card_storage.entities.get(id) orelse {
-        try req.respond("Not found in storage", .{ .status = .not_found });
-        return;
+    const evt = event.Event{
+        .timestamp = std.time.timestamp(),
+        .data = .{
+            .card_updated = .{
+                .id = id,
+                .title = parsed.value.title,
+                .description = parsed.value.description,
+            },
+        },
     };
 
-    const updated_card = try card_module.updateCardFromDTO(main_allocator, &card, parsed.value, board_entity);
-
-    try ctx.db.append(Card, updated_card, main_allocator, ctx.card_storage);
-    ctx.card_storage.mutex.unlock();
-
-    try req.respond("", .{ .status = .no_content });
+    try ctx.db.appendEvent(main_allocator, arena_allocator, evt, ctx.card_storage, ctx.board_storage);
+    return Response{
+        .body = "",
+        .status = .no_content,
+    };
 }
 
+//Helper functions
 fn readBody(allocator: std.mem.Allocator, request: *std.http.Server.Request) ![]u8 {
     var body_buffer: [1024]u8 = undefined;
     const body_reader = try request.readerExpectContinue(&body_buffer);
     return try body_reader.allocRemaining(allocator, .limited(MAX_REQUEST_BODY_SIZE));
+}
+
+fn parseCardId(path_params: std.StringHashMap([]const u8)) !u64 {
+    const id_str = path_params.get("id") orelse return error.MissingId;
+    return std.fmt.parseInt(u64, id_str, 10) catch return error.InvalidId;
 }
