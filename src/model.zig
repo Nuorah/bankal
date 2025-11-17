@@ -15,7 +15,6 @@ pub const Column = struct {
 
 pub const Card = struct {
     const Self = @This();
-    pub const TYPE_NAME = "card";
 
     id: u64,
     created_at: i64,
@@ -25,19 +24,6 @@ pub const Card = struct {
     description: []const u8,
     board_id: u8 = 0,
     code: []const u8,
-
-    pub fn init(_: std.mem.Allocator) !Card {
-        return Card{
-            .id = 0,
-            .created_at = 0,
-            .updated_at = 0,
-            .column = 0,
-            .title = "",
-            .description = "",
-            .board_id = 0,
-            .code = 0,
-        };
-    }
 
     pub fn clone(self: Card, allocator: std.mem.Allocator) !Self {
         return Card{
@@ -55,7 +41,6 @@ pub const Card = struct {
 
 pub const Board = struct {
     const Self = @This();
-    pub const TYPE_NAME = "board";
 
     pub const default_columns: []const Column = &.{
         Column{ .id = 0, .name = "Backlog" },
@@ -81,17 +66,6 @@ pub const Board = struct {
         return list;
     }
 
-    pub fn init(allocator: std.mem.Allocator) !Board {
-        return Board{
-            .id = 0,
-            .next_card_number = 1,
-            .name = "",
-            .code = "",
-            .description = "",
-            .columns = try initDefaultColumns(allocator),
-        };
-    }
-
     pub fn clone(self: Board, allocator: std.mem.Allocator) !Self {
         return Board{
             .id = self.id,
@@ -102,4 +76,14 @@ pub const Board = struct {
             .columns = try self.columns.clone(allocator),
         };
     }
+};
+
+pub const User = struct {
+    const Self = @This();
+
+    id: u64,
+    created_at: i64,
+    updated_at: i64,
+    name: []const u8,
+    board_order: ?std.ArrayList(u8),
 };

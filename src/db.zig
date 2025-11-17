@@ -63,8 +63,20 @@ pub const Database = struct {
         event_to_load: event.Event,
         card_storage: *Storage(model.Card),
         board_storage: *Storage(model.Board),
+        user_storage: *Storage(model.User),
     ) !void {
         switch (event_to_load.data) {
+            .user_created => |payload| {
+                const user = model.User{
+                    .id = 0,
+                    .name = try allocator.dupe(u8, payload.name),
+                    .board_order = null,
+                    .created_at = event_to_load.timestamp,
+                    .updated_at = event_to_load.timestamp,
+                };
+
+                try user_storage.entities.put(user.id, user);
+            },
             .card_created => |payload| {
                 const board_to_update = board_storage.entities.getPtr(payload.board_id) orelse return error.BoardNotFound;
                 const code = try std.fmt.allocPrint(allocator, "{s}-{d}", .{ board_to_update.code, board_to_update.next_card_number });
@@ -153,6 +165,7 @@ pub const Database = struct {
         allocator: std.mem.Allocator,
         card_storage: *Storage(model.Card),
         board_storage: *Storage(model.Board),
+        user_storage: *Storage(model.User),
     ) !void {
         var readerBuffer: [4096]u8 = undefined;
         var reader = self.wal_file.reader(&readerBuffer);
@@ -167,7 +180,7 @@ pub const Database = struct {
 
             defer event_to_load.deinit();
 
-            try loadEvent(allocator, event_to_load.value, card_storage, board_storage);
+            try loadEvent(allocator, event_to_load.value, card_storage, board_storage, user_storage);
         }
     }
 
@@ -178,6 +191,7 @@ pub const Database = struct {
         event_to_append: event.Event,
         card_storage: *Storage(model.Card),
         board_storage: *Storage(model.Board),
+        user_storage: *Storage(model.User),
     ) !void {
         board_storage.mutex.lock();
         defer board_storage.mutex.unlock();
@@ -205,6 +219,6 @@ pub const Database = struct {
 
         try self.wal_file.sync();
 
-        try loadEvent(main_allocator, event_to_append, card_storage, board_storage);
+        try loadEvent(main_allocator, event_to_append, card_storage, board_storage, user_storage);
     }
 };

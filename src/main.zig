@@ -23,6 +23,7 @@ const Context = struct {
     db: db.Database,
     card_storage: *db.Storage(model.Card),
     board_storage: *db.Storage(model.Board),
+    user_storage: *db.Storage(model.User),
 };
 
 const MAX_REQUEST_BODY_SIZE = 8192;
@@ -41,6 +42,8 @@ const routes = [_]http_common.Router.Route(Context){
     .{ .method = .GET, .path = "/api/boards", .handler = handleGetAllBoards },
     .{ .method = .GET, .path = "/api/boards/:id/cards", .handler = handleGetAllBoardCards, .match = .pattern },
     .{ .method = .POST, .path = "/api/boards", .handler = handleCreateBoard },
+
+    .{ .method = .GET, .path = "/api/user", .handler = handleGetUser },
 };
 
 const app_router = http_common.Router.Router(Context, &routes);
@@ -53,11 +56,12 @@ pub fn main() !void {
 
     var card_storage = db.Storage(model.Card).init(main_allocator);
     var board_storage = db.Storage(model.Board).init(main_allocator);
+    var user_storage = db.Storage(model.User).init(main_allocator);
 
     var database = try db.Database.init("kanban.wal");
     defer database.deinit();
 
-    try database.loadAllEvents(main_allocator, &card_storage, &board_storage);
+    try database.loadAllEvents(main_allocator, &card_storage, &board_storage, &user_storage);
     if (board_storage.entities.get(0)) |_| {} else {
         const create_main_board: event.Event = .{
             .timestamp = std.time.timestamp(),
@@ -70,12 +74,41 @@ pub fn main() !void {
             },
         };
 
-        try database.appendEvent(main_allocator, main_allocator, create_main_board, &card_storage, &board_storage);
+        try database.appendEvent(
+            main_allocator,
+            main_allocator,
+            create_main_board,
+            &card_storage,
+            &board_storage,
+            &user_storage,
+        );
+    }
+
+    // After loading events
+    if (user_storage.entities.get(0)) |_| {} else {
+        const create_default_user: event.Event = .{
+            .timestamp = std.time.timestamp(),
+            .data = .{
+                .user_created = .{
+                    .id = 0,
+                    .name = "Default User",
+                },
+            },
+        };
+        try database.appendEvent(
+            main_allocator,
+            main_allocator,
+            create_default_user,
+            &card_storage,
+            &board_storage,
+            &user_storage,
+        );
     }
 
     var context: Context = .{
         .card_storage = &card_storage,
         .board_storage = &board_storage,
+        .user_storage = &user_storage,
         .db = database,
     };
 
@@ -214,7 +247,7 @@ pub fn handleUpdateCardColumn(
         },
     };
 
-    try ctx.db.appendEvent(main_allocator, arena_allocator, evt, ctx.card_storage, ctx.board_storage);
+    try ctx.db.appendEvent(main_allocator, arena_allocator, evt, ctx.card_storage, ctx.board_storage, ctx.user_storage);
     return Response{
         .body = "",
         .status = .no_content,
@@ -268,7 +301,7 @@ pub fn handleUpdateCardBoard(
         },
     };
 
-    try ctx.db.appendEvent(main_allocator, arena_allocator, evt, ctx.card_storage, ctx.board_storage);
+    try ctx.db.appendEvent(main_allocator, arena_allocator, evt, ctx.card_storage, ctx.board_storage, ctx.user_storage);
     return Response{
         .body = "",
         .status = .no_content,
@@ -380,7 +413,7 @@ pub fn handleCreateBoard(
         },
     };
 
-    try ctx.db.appendEvent(main_allocator, arena_allocator, evt, ctx.card_storage, ctx.board_storage);
+    try ctx.db.appendEvent(main_allocator, arena_allocator, evt, ctx.card_storage, ctx.board_storage, ctx.user_storage);
     return Response{
         .body = "Created",
         .status = .created,
@@ -419,7 +452,7 @@ pub fn handleCreateCard(
         },
     };
 
-    ctx.db.appendEvent(main_allocator, arena_allocator, evt, ctx.card_storage, ctx.board_storage) catch |err| {
+    ctx.db.appendEvent(main_allocator, arena_allocator, evt, ctx.card_storage, ctx.board_storage, ctx.user_storage) catch |err| {
         if (err == error.BoardNotFound) {
             return Response{
                 .body = "Board not found",
@@ -470,11 +503,45 @@ pub fn handleUpdateCard(
         },
     };
 
-    try ctx.db.appendEvent(main_allocator, arena_allocator, evt, ctx.card_storage, ctx.board_storage);
+    try ctx.db.appendEvent(main_allocator, arena_allocator, evt, ctx.card_storage, ctx.board_storage, ctx.user_storage);
     return Response{
         .body = "",
         .status = .no_content,
     };
+}
+
+fn handleGetUser(
+    _: std.mem.Allocator,
+    arena_allocator: std.mem.Allocator,
+    ctx: *Context,
+    req: *std.http.Server.Request,
+    _: std.StringHashMap([]const u8),
+    _: std.StringHashMap([]const u8),
+) !Response {
+    var allocating_writer: std.io.Writer.Allocating = .init(arena_allocator);
+    defer allocating_writer.deinit();
+
+    var json_writer: std.json.Stringify = .{
+        .writer = &allocating_writer.writer,
+        .options = .{ .emit_strings_as_arrays = false, .whitespace = .minified },
+    };
+
+    const id = try parseUserId(req);
+
+    const user = ctx.user_storage.entities.get(id) orelse {
+        return Response{
+            .body = "User not found",
+            .status = .not_found,
+        };
+    };
+
+    const user_dto = try dto.User.toDTO(arena_allocator, user);
+
+    try json_writer.write(user_dto);
+
+    const json_bytes = allocating_writer.written();
+
+    return Response.json(try arena_allocator.dupe(u8, json_bytes));
 }
 
 //Helper functions
@@ -487,4 +554,8 @@ fn readBody(allocator: std.mem.Allocator, request: *std.http.Server.Request) ![]
 fn parseCardId(path_params: std.StringHashMap([]const u8)) !u64 {
     const id_str = path_params.get("id") orelse return error.MissingId;
     return std.fmt.parseInt(u64, id_str, 10) catch return error.InvalidId;
+}
+
+fn parseUserId(_: *std.http.Server.Request) !u64 {
+    return 0;
 }

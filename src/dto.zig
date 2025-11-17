@@ -82,3 +82,22 @@ pub const BoardCreate = struct {
     code: []const u8,
     description: []const u8,
 };
+
+//User dtos
+pub const User = struct {
+    pub const Self = @This();
+
+    id: []const u8,
+    board_order: ?[]const u8,
+
+    pub fn toDTO(allocator: std.mem.Allocator, user: model.User) !Self {
+        var board_order: ?[]const u8 = null;
+        if (user.board_order) |order| {
+            board_order = try allocator.dupe(u8, order.items);
+        }
+        return Self{
+            .id = try std.fmt.allocPrint(allocator, "{d}", .{user.id}),
+            .board_order = board_order,
+        };
+    }
+};

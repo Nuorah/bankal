@@ -12,6 +12,8 @@ pub const Data = union(enum) {
     card_moved_board: CardMovedBoardEvent,
 
     board_created: BoardCreatedEvent,
+
+    user_created: UserCreatedEvent,
 };
 
 //Card event structs
@@ -44,4 +46,10 @@ pub const BoardCreatedEvent = struct {
     name: []const u8,
     code: []const u8,
     description: []const u8,
+};
+
+//User event structs
+pub const UserCreatedEvent = struct {
+    id: u64,
+    name: []const u8,
 };

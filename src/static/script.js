@@ -66,6 +66,7 @@ function kanban() {
           console.error('Failed to load boards:', response.status);
         }
         this.boards = await response.json();
+        this.boards.sort((a, b) => a.id - b.id);
       } catch (error) {
         console.error('Error loading boards:', error);
       }
