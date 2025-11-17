@@ -3,7 +3,10 @@
     .version = "0.3.0",
     .fingerprint = 0x31e5890073ea0c95,
     .dependencies = .{
-        .http_common = .{ .path = "../http_common" },
+        .http_common = .{
+            .url = "https://github.com/nuorah/http_common/archive/refs/tags/v0.3.1.tar.gz",
+            .hash = "http_common-0.3.1-jepTvao9AAAjs1of8WKjJEtG4p5Ps4BdCCB6CpzmqlE9",
+        },
     },
     .paths = .{
         "build.zig",

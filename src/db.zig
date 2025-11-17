@@ -1,3 +1,7 @@
+// Event-sourced storage layer
+// All state changes are persisted as events in append-only WAL
+// Current state is rebuilt by replaying all events on startup
+
 const std = @import("std");
 const model = @import("model.zig");
 const event = @import("event.zig");

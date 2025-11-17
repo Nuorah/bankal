@@ -1,3 +1,8 @@
+// Bankal - Event-sourced Kanban Board
+// Single-user personal kanban with CQRS/ES architecture
+// Embeds static assets, event-sourced persistence via WAL
+// Designed for localhost or behind reverse proxy (no built-in auth)
+
 const std = @import("std");
 const http_common = @import("http_common");
 const db = @import("db.zig");
@@ -557,5 +562,7 @@ fn parseCardId(path_params: std.StringHashMap([]const u8)) !u64 {
 }
 
 fn parseUserId(_: *std.http.Server.Request) !u64 {
+    // Single-user app, hardcoded to user 0
+    // TODO add proper auth and multi user
     return 0;
 }
