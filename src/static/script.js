@@ -1,4 +1,6 @@
 import Alpine from 'alpinejs';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 
 function kanban() {
   return {
@@ -232,11 +234,17 @@ function kanban() {
 
       this.cardDragOverColumn = null;
       return false;
-    }
+    },
+
+    renderMarkdown(text) {
+      if (!text) return 'No description';
+      return DOMPurify.sanitize(marked.parse(text));
+    },
   }
 }
 
 window.Alpine = Alpine;
 window.kanban = kanban;
+window.marked = marked;
 
 Alpine.start();

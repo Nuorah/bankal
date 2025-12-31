@@ -67,7 +67,7 @@
         </div>
 
         <div class="modal-content">
-          <p x-text="selectedCard?.description || 'No description'"></p>
+          <p x-html="renderMarkdown(selectedCard?.description)"></p>
         </div>
 
         <!-- Column selector dropdown -->
