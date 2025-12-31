@@ -15,7 +15,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const exe = b.addExecutable(.{
-        .name = "kanban",
+        .name = "bankal",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
@@ -28,13 +28,11 @@ pub fn build(b: *std.Build) void {
     exe.step.dependOn(&bundle_frontend.step);
 
     b.installArtifact(exe);
-
-    const http_common_dep = b.dependency("http_common", .{
+    const http_common_mod = b.addModule("http_common", .{
+        .root_source_file = b.path("src/vendor/http_common/src/root.zig"),
         .target = target,
         .optimize = optimize,
     });
-
-    const http_common_mod = http_common_dep.module("http_common");
     exe.root_module.addImport("http_common", http_common_mod);
 
     const run_cmd = b.addRunArtifact(exe);
@@ -47,7 +45,6 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run the server");
     run_step.dependOn(&run_cmd.step);
 
-    // Optional: separate step just for bundling
     const bundle_step = b.step("bundle", "Bundle frontend assets");
     bundle_step.dependOn(&bundle_frontend.step);
 }
