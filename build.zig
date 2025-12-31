@@ -35,6 +35,13 @@ pub fn build(b: *std.Build) void {
     });
     exe.root_module.addImport("http_common", http_common_mod);
 
+    const event_wal_mod = b.addModule("event_wal", .{
+        .root_source_file = b.path("src/vendor/event_wal/src/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    exe.root_module.addImport("event_wal", event_wal_mod);
+
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
 

@@ -1,3 +1,6 @@
 [submodule "src/vendor/http_common"]
 	path = src/vendor/http_common
 	url = https://git.nuorah.fr/harmoat/http_common.git
+[submodule "src/vendor/event_wal"]
+	path = src/vendor/event_wal
+	url = https://git.nuorah.fr/harmoat/event_wal.git

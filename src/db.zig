@@ -5,60 +5,27 @@
 const std = @import("std");
 const model = @import("model.zig");
 const event = @import("event.zig");
+const event_wal = @import("event_wal");
 
 pub fn Storage(comptime T: type) type {
-    return struct {
-        const Self = @This();
-        pub const EntityType = T;
-
-        entities: std.AutoHashMap(u64, T),
-        mutex: std.Thread.Mutex = .{},
-
-        pub fn init(allocator: std.mem.Allocator) Self {
-            return .{
-                .entities = std.AutoHashMap(u64, T).init(allocator),
-            };
-        }
-
-        pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
-            const iter = self.entities.iterator();
-            while (iter.next()) |entity| {
-                entity.value_ptr.deinit(allocator);
-            }
-            self.entities.deinit();
-        }
-    };
+    return event_wal.Storage(u64, T);
 }
+
+const Wal = event_wal.Wal(event.Event);
 
 pub const Database = struct {
     const Self = @This();
 
-    wal_path: []const u8,
-    wal_file: std.fs.File,
+    wal: Wal,
 
     pub fn init(wal_path: []const u8) !Database {
-        const file = std.fs.cwd().openFile(wal_path, .{ .mode = .read_write }) catch |err| {
-            if (err == error.FileNotFound) {
-                const new_file = try std.fs.cwd().createFile(wal_path, .{});
-                new_file.close();
-
-                const wal_file = try std.fs.cwd().openFile(wal_path, .{ .mode = .read_write });
-                return .{
-                    .wal_path = wal_path,
-                    .wal_file = wal_file,
-                };
-            }
-            return err;
-        };
-
         return .{
-            .wal_path = wal_path,
-            .wal_file = file,
+            .wal = try Wal.init(wal_path),
         };
     }
 
     pub fn deinit(self: *Database) void {
-        self.wal_file.close();
+        self.wal.deinit();
     }
 
     // Not thread safe, to use at launch or lock storage mutex around it
@@ -171,8 +138,8 @@ pub const Database = struct {
         board_storage: *Storage(model.Board),
         user_storage: *Storage(model.User),
     ) !void {
-        var readerBuffer: [4096]u8 = undefined;
-        var reader = self.wal_file.reader(&readerBuffer);
+        var reader_buffer: [4096]u8 = undefined;
+        var reader = self.wal.reader(&reader_buffer);
 
         while (try reader.interface.takeDelimiter('\n')) |line| {
             if (line.len == 0) continue;
@@ -202,26 +169,7 @@ pub const Database = struct {
         card_storage.mutex.lock();
         defer card_storage.mutex.unlock();
 
-        var writerBuffer: [4096]u8 = undefined;
-        var writer = self.wal_file.writer(&writerBuffer);
-        try writer.seekTo(try writer.file.getEndPos());
-
-        var allocating_writer: std.io.Writer.Allocating = .init(arena_allocator);
-        defer allocating_writer.deinit();
-
-        var json_writer: std.json.Stringify = .{
-            .writer = &allocating_writer.writer,
-            .options = .{ .whitespace = .minified },
-        };
-
-        try json_writer.write(event_to_append);
-        const json_bytes = allocating_writer.written();
-
-        try writer.interface.writeAll(json_bytes);
-        try writer.interface.writeByte('\n');
-        try writer.interface.flush();
-
-        try self.wal_file.sync();
+        try self.wal.append(arena_allocator, event_to_append);
 
         try loadEvent(main_allocator, event_to_append, card_storage, board_storage, user_storage);
     }
