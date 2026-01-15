@@ -34,11 +34,12 @@ git submodule update --init --recursive
 ## Build & Run
 
 ```bash
-cd static/ && bun install
 zig build run
 ```
 
-Server runs on `localhost:8080`. WAL file created automatically.
+zig build will install frontend dependencies and bundle fronted.
+
+Server runs on `localhost:8080`. The database will be created automatically.
 
 ## Deployment
 
