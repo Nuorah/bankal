@@ -4,6 +4,13 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    // Install frontend deps
+    const bun_install = b.addSystemCommand(&[_][]const u8{
+        "bun",
+        "install",
+    });
+    bun_install.setCwd(b.path("src/static"));
+
     // Bundle frontend with Bun
     const bundle_frontend = b.addSystemCommand(&[_][]const u8{
         "bun",
@@ -13,6 +20,7 @@ pub fn build(b: *std.Build) void {
         "--minify",
         "--target=browser",
     });
+    bundle_frontend.step.dependOn(&bun_install.step);
 
     const exe = b.addExecutable(.{
         .name = "bankal",
@@ -24,10 +32,10 @@ pub fn build(b: *std.Build) void {
     });
 
     exe.linkLibC();
-
     exe.step.dependOn(&bundle_frontend.step);
 
     b.installArtifact(exe);
+
     const http_common_mod = b.addModule("http_common", .{
         .root_source_file = b.path("src/vendor/http_common/src/root.zig"),
         .target = target,
@@ -52,6 +60,6 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run the server");
     run_step.dependOn(&run_cmd.step);
 
-    const bundle_step = b.step("bundle", "Bundle frontend assets");
+    const bundle_step = b.step("bundle", "Install deps and bundle frontend");
     bundle_step.dependOn(&bundle_frontend.step);
 }
