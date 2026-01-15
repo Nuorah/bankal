@@ -1,18 +1,35 @@
 # Bankal
 
-Personal kanban board built with Zig + Alpine.js. Uses event sourcing/CQRS.
+Personal kanban board built with Zig + Alpine.js.
 
 ## Features
 
 - Multiple boards
 - Drag & drop cards
-- Event-sourced persistence (append-only WAL)
+- Simple wal file persistence
 - Single binary, embeds frontend
 
 ## Prerequisites
 
-- Zig 0.15.2 (later might break it)
+- Zig 0.15.2 
 - Bun (for bundling frontend)
+
+## Dependencies
+
+HTTP server and WAL persistence live in `src/vendor/` as git submodules:
+
+- `event_wal` - append-only WAL + thread-safe storage
+- `http_common` - minimal HTTP router/server
+
+Clone with submodules:
+```bash
+git clone --recurse-submodules https://github.com/yourusername/kanban.git
+```
+
+Or if you already cloned:
+```bash
+git submodule update --init --recursive
+```
 
 ## Build & Run
 
@@ -41,11 +58,11 @@ PATCH /api/cards/:id/column   - move column
 PATCH /api/cards/:id/board    - move board
 ```
 
-## Architecture
-
-Event sourcing: all changes = events appended to WAL. State is rebuilt from events on startup, which works well enough for small scale.
-
 ## License
 
 AGPL-3.0
-Alpine.js is MIT licensed (see LICENSES).
+
+Third-party licenses in `LICENSES/`:
+- Alpine.js (MIT)
+- DOMPurify (Apache-2.0 or MPL-2.0)
+- Marked (MIT)
