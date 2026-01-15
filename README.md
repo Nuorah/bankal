@@ -37,7 +37,7 @@ git submodule update --init --recursive
 zig build run
 ```
 
-zig build will install frontend dependencies and bundle fronted.
+zig build will have bun install frontend dependencies and bundle frontend.
 
 Server runs on `localhost:8080`. The database will be created automatically.
 
