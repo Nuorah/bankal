@@ -66,7 +66,9 @@ pub fn main() !void {
     var database = try db.Database.init("kanban.wal");
     defer database.deinit();
 
-    try database.loadAllEvents(main_allocator, &card_storage, &board_storage, &user_storage);
+    var startup_arena = std.heap.ArenaAllocator.init(main_allocator);
+
+    try database.loadAllEvents(main_allocator, startup_arena.allocator(), &card_storage, &board_storage, &user_storage);
     if (board_storage.entities.get(0)) |_| {} else {
         const create_main_board: event.Event = .{
             .timestamp = std.time.timestamp(),
@@ -88,6 +90,7 @@ pub fn main() !void {
             &user_storage,
         );
     }
+    startup_arena.deinit();
 
     // After loading events
     if (user_storage.entities.get(0)) |_| {} else {

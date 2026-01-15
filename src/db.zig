@@ -134,24 +134,15 @@ pub const Database = struct {
     pub fn loadAllEvents(
         self: *Self,
         allocator: std.mem.Allocator,
+        arena_allocator: std.mem.Allocator,
         card_storage: *Storage(model.Card),
         board_storage: *Storage(model.Board),
         user_storage: *Storage(model.User),
     ) !void {
-        var reader_buffer: [4096]u8 = undefined;
-        var reader = self.wal.reader(&reader_buffer);
+        const events = try self.wal.readAll(arena_allocator);
 
-        while (try reader.interface.takeDelimiter('\n')) |line| {
-            if (line.len == 0) continue;
-
-            const event_to_load = std.json.parseFromSlice(event.Event, allocator, line, .{ .ignore_unknown_fields = true }) catch |err| {
-                std.log.err("Failed to parse event, invalid data, aborting: {}", .{err});
-                return err;
-            };
-
-            defer event_to_load.deinit();
-
-            try loadEvent(allocator, event_to_load.value, card_storage, board_storage, user_storage);
+        for (events.items) |event_to_load| {
+            try loadEvent(allocator, event_to_load, card_storage, board_storage, user_storage);
         }
     }
 
